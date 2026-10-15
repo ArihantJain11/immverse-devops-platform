@@ -1,0 +1,21 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.tenantId }}-api-pdb
+  namespace: {{ .Values.tenantId }}
+spec:
+  minAvailable: 75%
+  selector:
+    matchLabels:
+      app: {{ .Values.tenantId }}-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.tenantId }}-worker-pdb
+  namespace: {{ .Values.tenantId }}
+spec:
+  minAvailable: 75%
+  selector:
+    matchLabels:
+      app: {{ .Values.tenantId }}-worker

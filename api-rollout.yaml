@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .Values.tenantId }}-api
+  namespace: {{ .Values.tenantId }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    canary:
+      canaryService: {{ .Values.tenantId }}-api-canary
+      stableService: {{ .Values.tenantId }}-api-stable
+      trafficRouting:
+        nginx:
+          stableIngress: {{ .Values.tenantId }}-api-ingress
+      steps:
+      - setWeight: 10
+      - pause: { duration: 1m }
+      - setWeight: 25
+      - pause: { duration: 2m }
+      - setWeight: 50
+      - pause: { duration: 2m }
+  selector:
+    matchLabels:
+      app: {{ .Values.tenantId }}-api
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.tenantId }}-api
+    spec:
+      containers:
+      - name: api
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        args: ["-text=OK", "-listen=:8080"]
+        ports:
+        - containerPort: {{ .Values.api.port }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: {{ .Values.api.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: {{ .Values.api.port }}
+          initialDelaySeconds: 2
+          periodSeconds: 2
+        resources:
+          {{- toYaml .Values.api.resources | nindent 10 }}

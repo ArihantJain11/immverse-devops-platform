@@ -1,0 +1,19 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ .Values.tenantId }}-worker-scaler
+  namespace: {{ .Values.tenantId }}
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: {{ .Values.tenantId }}-worker
+  minReplicaCount: {{ .Values.worker.replicas }}
+  maxReplicaCount: {{ .Values.worker.maxReplicas }}
+  cooldownPeriod: 300
+  triggers:
+  - type: redis
+    metadata:
+      address: {{ .Values.env.REDIS_HOST }}:{{ .Values.env.REDIS_PORT }}
+      listName: job_queue
+      listLength: "{{ .Values.worker.targetQueueLength }}"
+      enableTLS: "false"
