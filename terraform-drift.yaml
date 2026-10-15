@@ -1,0 +1,35 @@
+name: Terraform Drift Detection
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Every night at 02:00 UTC
+  workflow_dispatch:
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.0
+
+      - name: Terraform Init & Plan (AWS Cloud)
+        id: plan
+        continue-on-error: true
+        working-directory: terraform/environments/aws-cloud
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          terraform init -input=false
+          terraform plan -detailed-exitcode -no-color -out=tfplan
+
+      - name: Notify on Drift
+        if: steps.plan.outputs.exitcode == 2
+        run: |
+          echo "Drift detected! Infrastructure has drifted from the declared state."
+          # Optionally trigger webhook, Slack notification, or create a GitHub Issue
