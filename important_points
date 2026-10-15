@@ -1,0 +1,46 @@
+1. Check active queue depth:
+kubectl exec -it redis-master-0 -n datastores -- redis-cli -a devpassword llen job_queue
+
+2. Allow active workers to process existing in-flight jobs.
+
+3. If pods must terminate, send SIGTERM which gives pods 70 seconds to finish:
+kubectl rollout restart deployment/shared-worker -n shared
+
+Runbook 2: Database Migration Failure & Recovery
+Context
+A non-backward-compatible database migration job fails halfway through, locking tables or erroring out.
+Steps
+1. Identify the failing migration pod:
+kubectl get pods -n shared -l job-name=db-migration
+kubectl logs -n shared job/db-migration
+
+2. Roll back application traffic to stable version:
+kubectl argo rollouts abort shared-api -n shared
+kubectl argo rollouts undo shared-api -n shared
+
+3. Connect to PgBouncer / PostgreSQL directly:
+kubectl exec -it postgres-postgresql-0 -n datastores -- psql -U postgres -d app
+
+4. Query locks and drop blocking migrations:
+SELECT pid, query, state FROM pg_stat_activity WHERE state != 'idle';
+
+5. Apply compensation script (Expand/Contract inverse script).
+
+
+Runbook 3: Disaster Recovery Restore Test
+Context
+Validate automated point-in-time recovery (PITR) for PostgreSQL.
+
+Steps
+Create a snapshot backup:
+1. kubectl exec postgres-postgresql-0 -n datastores -- pg_dump -U postgres app > /tmp/backup_test.sql
+
+2. Inject a simulated failure:
+kubectl exec postgres-postgresql-0 -n datastores -- psql -U postgres -d app -c "DROP TABLE users;"
+
+3. Restore database from backup:
+cat /tmp/backup_test.sql | kubectl exec -i postgres-postgresql-0 -n datastores -- psql -U postgres -d app
+
+4. Verify table integrity:
+kubectl exec postgres-postgresql-0 -n datastores -- psql -U postgres -d app -c "SELECT COUNT(*) FROM users;"
+
