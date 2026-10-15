@@ -1,1 +1,1 @@
-aws_region = "eu-west-1"
+# Local development overrides
