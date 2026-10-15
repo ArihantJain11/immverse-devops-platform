@@ -1,28 +1,38 @@
-tenantId: tenant-eu-01
-replicaCount: 2
+tenantId: shared
+replicaCount: 4
 
 image:
   repository: hashicorp/http-echo
   tag: "latest"
+  pullPolicy: IfNotPresent
 
 api:
+  port: 8080
   resources:
     requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
       cpu: 500m
       memory: 512Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
   hpa:
-    minReplicas: 2
-    maxReplicas: 20
+    minReplicas: 4
+    maxReplicas: 55
+    targetCPUUtilizationPercentage: 70
 
 worker:
-  replicas: 4
-  maxReplicas: 20
-  targetQueueLength: 15
+  replicas: 8
+  maxReplicas: 40
+  targetQueueLength: 25
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 env:
-  DATA_RESIDENCY: "EU_STRICT"
-  REDIS_HOST: "redis-dedicated.tenant-eu-01.svc.cluster.local"
-  DATABASE_URL: "postgresql://postgres:devpassword@postgres-dedicated.tenant-eu-01.svc.cluster.local:5432/app"
+  REDIS_HOST: "redis-master.datastores.svc.cluster.local"
+  REDIS_PORT: "6379"
+  DATABASE_URL: "postgresql://postgres:devpassword@postgres-postgresql.datastores.svc.cluster.local:5432/app"
