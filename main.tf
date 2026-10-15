@@ -1,35 +1,41 @@
-terraform {
-  required_version = ">= 1.6.0"
-  required_providers {
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.30"
-    }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.13"
-    }
+variable "cluster_domain" {
+  type    = string
+  default = "local.dev"
+}
+
+resource "helm_release" "ingress_nginx" {
+  name             = "ingress-nginx"
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  chart            = "ingress-nginx"
+  version          = "4.10.0"
+  namespace        = "ingress-nginx"
+  create_namespace = true
+
+  set {
+    name  = "controller.metrics.enabled"
+    value = "true"
   }
 }
 
-provider "kubernetes" {
-  config_path = "~/.kube/config"
-}
+resource "helm_release" "argo_rollouts" {
+  name             = "argo-rollouts"
+  repository       = "https://argoproj.github.io/argo-helm"
+  chart            = "argo-rollouts"
+  version          = "2.37.0"
+  namespace        = "argo-rollouts"
+  create_namespace = true
 
-provider "helm" {
-  kubernetes {
-    config_path = "~/.kube/config"
+  set {
+    name  = "dashboard.enabled"
+    value = "true"
   }
 }
 
-module "base_platform" {
-  source = "../../modules/kubernetes_base"
-}
-
-module "tenant_shared" {
-  source       = "../../modules/tenant_isolated"
-  tenant_id    = "shared"
-  region       = "local"
-  cpu_quota    = "8"
-  memory_quota = "16Gi"
+resource "helm_release" "keda" {
+  name             = "keda"
+  repository       = "https://kedacore.github.io/charts"
+  chart            = "keda"
+  version          = "2.14.0"
+  namespace        = "keda"
+  create_namespace = true
 }
