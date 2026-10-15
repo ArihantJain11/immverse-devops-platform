@@ -1,41 +1,69 @@
-variable "cluster_domain" {
+variable "tenant_id" {
+  type        = string
+  description = "Unique alphanumeric identifier for the tenant"
+}
+
+variable "region" {
+  type        = string
+  description = "Target deployment region (e.g., eu-west-1, us-east-1)"
+}
+
+variable "cpu_quota" {
   type    = string
-  default = "local.dev"
+  default = "16"
 }
 
-resource "helm_release" "ingress_nginx" {
-  name             = "ingress-nginx"
-  repository       = "https://kubernetes.github.io/ingress-nginx"
-  chart            = "ingress-nginx"
-  version          = "4.10.0"
-  namespace        = "ingress-nginx"
-  create_namespace = true
+variable "memory_quota" {
+  type    = string
+  default = "32Gi"
+}
 
-  set {
-    name  = "controller.metrics.enabled"
-    value = "true"
+resource "kubernetes_namespace" "tenant" {
+  metadata {
+    name = "tenant-${var.tenant_id}"
+    labels = {
+      "tenant"         = var.tenant_id
+      "region"         = var.region
+      "data-residency" = var.region == "eu-central-1" || var.region == "eu-west-1" ? "EU-STRICT" : "GLOBAL"
+    }
   }
 }
 
-resource "helm_release" "argo_rollouts" {
-  name             = "argo-rollouts"
-  repository       = "https://argoproj.github.io/argo-helm"
-  chart            = "argo-rollouts"
-  version          = "2.37.0"
-  namespace        = "argo-rollouts"
-  create_namespace = true
-
-  set {
-    name  = "dashboard.enabled"
-    value = "true"
+resource "kubernetes_resource_quota" "tenant_quota" {
+  metadata {
+    name      = "tenant-quota"
+    namespace = kubernetes_namespace.tenant.metadata[0].name
+  }
+  spec {
+    hard = {
+      "requests.cpu"    = var.cpu_quota
+      "requests.memory" = var.memory_quota
+      "limits.cpu"      = tostring(tonumber(var.cpu_quota) * 2)
+      "limits.memory"   = tostring(tonumber(regex("[0-9]+", var.memory_quota)) * 2) + "Gi"
+      "pods"            = "60"
+    }
   }
 }
 
-resource "helm_release" "keda" {
-  name             = "keda"
-  repository       = "https://kedacore.github.io/charts"
-  chart            = "keda"
-  version          = "2.14.0"
-  namespace        = "keda"
-  create_namespace = true
+resource "kubernetes_network_policy" "tenant_isolation" {
+  metadata {
+    name      = "default-deny-cross-tenant"
+    namespace = kubernetes_namespace.tenant.metadata[0].name
+  }
+  spec {
+    pod_selector {}
+    ingress {
+      from {
+        namespace_selector {
+          match_labels = {
+            "kubernetes.io/metadata.name" = "ingress-nginx"
+          }
+        }
+      }
+      from {
+        pod_selector {} # allow intra-namespace
+      }
+    }
+    policy_types = ["Ingress"]
+  }
 }
