@@ -1,0 +1,28 @@
+tenantId: tenant-eu-01
+replicaCount: 2
+
+image:
+  repository: hashicorp/http-echo
+  tag: "latest"
+
+api:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  hpa:
+    minReplicas: 2
+    maxReplicas: 20
+
+worker:
+  replicas: 4
+  maxReplicas: 20
+  targetQueueLength: 15
+
+env:
+  DATA_RESIDENCY: "EU_STRICT"
+  REDIS_HOST: "redis-dedicated.tenant-eu-01.svc.cluster.local"
+  DATABASE_URL: "postgresql://postgres:devpassword@postgres-dedicated.tenant-eu-01.svc.cluster.local:5432/app"
